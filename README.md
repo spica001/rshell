@@ -3,7 +3,7 @@
 <p>In this project, we are building a student made command shell using C++ source code. It takes in a string of commands and connectors from the user that will be executed in the shell.</p> 
 
 <h2>RShell Features</h2>
-<p>The commands are parsed so that they are separated into their command and argument lists. In addition, the connectors are also parsed while anything after a comment is excluded from the parsing process.</p>
+<p>The commands are parsed so that they are separated into their command and argument lists. The program looks for connectors while ignoring anything after a "#".</p>
 
 <p>Once the commands are successfully parsed, then the commands will be executed. If the command is successfully executed, then the command will behave as intended. However, if it does not succeed, then the command will result in an error message.</p>
 
