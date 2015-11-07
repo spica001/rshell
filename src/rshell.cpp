@@ -141,6 +141,9 @@ int main()
       }
    }
 
+
+
+    //check commands
    for(int i = 0; i != commands.size(); i++)
    {
      cout << commands.at(i) << endl;
@@ -161,13 +164,14 @@ int main()
     {
       perror("fork failed");
       exit(1);
+      //clear vector
     }
 
     else if (c_pid == 0)
     {
       printf("Child: executing j\n");
-      execvp(args[0], args);
-      perror("execvp failed");
+      status = execvp(args[0], args);
+      if(status<0) perror("execvp failed");
     }
 
     else if (c_pid > 0)
