@@ -7,191 +7,283 @@
 #include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>
-
-//FIRST PUSH - still buggy etc
+#include <boost/tokenizer.hpp>
+#include <boost/algorithm/string.hpp>
+#include <pwd.h>
 
 using namespace std;
+using namespace boost;
 
-int min2(int a, int b)
+void user_prompt()
 {
-  if (a < 0)
+  string input;
+  
+  if (getlogin() != NULL)
   {
-    return b;
+    cout << getlogin() << "@";
   }
-  if (b < 0)
+  
+  char servername[64] = {0};
+  
+  if (gethostname(servername, 64) != -1)
   {
-    return a;
+    gethostname(servername, 64);
+    cout << servername << " ";
   }
-
-  if(a < b)
-  {
-    return a;
-  }
-  else
-  return b;
+    cout <<"$ ";
 }
 
-// returns the least of three numbers
-int min3(int a, int b, int c)
+void parse_commands(vector<string> &vec, const string &str)
 {
-  if(a < 0)
-  {
-    return min2(b,c);
-  }
+  //takes in a vector of strings and a string (used in the delimmiter)
+    
+   typedef tokenizer <char_separator<char> > tokenizer;
+   char_separator<char> delimiter(" ", ";&|#"); //space is the thing ignored. the other arguments are things that /stay/
+   //the delimiter defines characters to be "ignored" in boost parsing
+   
+   tokenizer tokens(str, delimiter); //spaces are now ignored
+   
+   //the commands themselves are now inserted into a vector
+   //tokens use iterators, but so auto is used for simplicity
+   for (auto it = tokens.begin(); it != tokens.end(); it++) 
+   {
+     vec.push_back(*it);
+     //cout << (*it) << endl;
+   }
+}
 
-  if(b < 0)
-  {
-    return min2(a,c);
-  }
+void parse_separators(vector<string> &new_vec, vector<string> &v2, vector<vector<string>> &commandpacks, vector<string> &commands)
+//vectorseparators , vectorcommands, commands separated, commands individual
+{
+  //pushes back everything that isn't a connector currently
+  //cout << "Hello" << endl;
+  //the vector from parsecommands is passed into here
+  //the separators are now in their own vector (new_vec)
+  
+  //while a connector is not found when iterating, concatinate the elemends I have
+  //when I find an element, I push back everything together
+  //then I clear the temporary variable
+  //stop when I reach the end of the vector
 
-  if(c < 0)
+  //string s = "";
+  
+  for(int i = 0; i < v2.size(); i++)
   {
-    return min2(a,b);
-  }
-
-  if(a < b)
-  {
-    if(a < c)
+    //cout << "Hello" << endl;
+    if (i == v2.size() - 1)
     {
-      return a;
+      commands.push_back(v2.at(i));
+      new_vec.push_back(v2.at(i));
+      commandpacks.push_back(commands);
     }
-    else
-    return c;
+    
+    else if(i > 0 && ((v2.at(i) == ";") || (v2.at(i) == "&" && v2.at(i-1) == "&") || (v2.at(i) == "|" && v2.at(i-1) == "|" ) || (v2.at(i) == "#")))
+    {
+        //s += v2.at(i) + " ";
+        new_vec.push_back(v2.at(i));
+        commandpacks.push_back(commands);
+        commands.clear(); //clears it for future use
+    }
+    
+    else if ((v2.at(i) != "&" && v2.at(i) != "|"))
+    {
+      commands.push_back(v2.at(i));
+    }
+      //cout << v2.at(i) << endl; 
   }
-  else if(b < c)
-  {
-    return b;
-  }
-  else
-  return c;
+
+    //else
+    //{
+      //new_vec.push_back(s);
+      //s = "";
+    //}
 }
 
+
+
+
+bool exit_terminal(vector<vector<string>>& v3, int pos)
+{
+  if(v3.at(pos).at(0) == "exit") // checks the vector inserted if it contains "exit"
+  {
+    return true; //if true, then break out of the while loop and end the program
+  }
+  return false; //otherwise the looping continues
+}
+  
+bool exec_check(vector<char*> &input)
+{
+  int c_pid = fork();
+  int status;
+  
+  //if c_pid is less than 0, the child is an error
+  // "zombie" process : -1
+  if (c_pid < 0)
+  {
+    perror("Error: The Fork Failed");
+    exit(1);
+  }
+  
+  //if c_pid is equal to 0 then the child
+  else if (c_pid == 0)
+  {
+    //cout << "Hello" << endl;
+    if (execvp(input.at(0), &(input[0])) == -1)
+    {
+      perror("Error: Exec Failed");
+      exit(1);
+    }
+    exit(0);
+  }
+  
+  else if (c_pid > 0)
+  {
+    if(wait(&status) == -1)
+    {
+      perror("Error: Wait Failed");
+    }
+    if(status != 0)
+    {
+      return false;
+    }
+  }
+  return true;
+}
+
+
+//takes in a vector of commands (including separators)
+//scans the connectors
+//status comes from the exec check
+//execvp returns -1 (failed) or anything else (didn't fail)
+
+//vector with commands
+//this checks if I go on (true) or not (false) in order to do the while loop for execvp again
+bool connector_test(bool status, vector<string> &v4, int j)
+{
+  if(v4.size() <= j)
+  {
+    return false;
+  }
+
+  if(v4.at(j) == "&") //if true, go ahead and execvp again
+  {
+    return status;
+  }
+    
+  else if(v4.at(j) == "|") //if false execvp again
+  {
+    return !status;
+  }
+    
+  else if(v4.at(j) == ";") //keep going for execvp again
+  {
+    return true;
+  }
+    
+  else if(v4.at(j) == "#")
+  {
+    return false; //quits reading, so no need for break
+    //break;
+  }
+    
+  else
+  {
+    return false;
+  }
+}
+
+void string_char_conversion(vector<string> &v5, vector<char*> &new_vec2)
+{
+  char* s2;
+  for(int k = 0; k < v5.size(); k++)
+  {
+    s2 = new char[v5.at(k).size() + 1];
+    memcpy(s2, v5.at(k).c_str(), v5.at(k).size() + 1);
+    new_vec2.push_back(s2);
+  }
+  new_vec2.push_back('\0');
+}
 
 
 int main()
 {
- // ; , || and &&
- // look for each of them to check
-
-  string input;
-  string com; //individual commands from the vector
-  int semicolon = 0;
-  int bar = 0;
-  int ands = 0;
-  int sharp = 0;
-  int start = 0; //location of the string as the loop moves along.
-  int otherStart = 0; // stores the old value of start.
-  vector<string> commands; //vector to store the commands inside.
-  const vector<char*> execcommands;
-
-
-  while(true) // want infinite loop until break
+  //cout << "Hello World" << endl; //testing
+  while(true) //the shell is an infinite loop until it exits (breaks)
   {
-     if (getlogin() != NULL)
-    {
-		cout << getlogin() << "@";
-    }
-    char servername[64] = {0};
-    if (gethostname(servername, 64) != -1)
-    {
-		gethostname(servername, 64);
-		cout << servername << " ";
-    }
-    cout <<"$ ";
-	getline (cin, input);
-
-    sharp = input.find("#", start);
-    input = input.substr(0, sharp); //this gets everything from 0 to before sharp - so this is the input?
-
-
-
-
-   while(true)
-   {
-      //these finds are used to get the commands
-      semicolon = input.find(";",start);
-      bar = input.find("||",start);
-      ands = input.find("&&",start);
-
-
-      //cout << min3(semicolon,bar,ands) << endl; - testing purposes
-
-      start = min3(semicolon,bar,ands)+1;
-
-      if(input[start] == '#' || input[otherStart] == '#')
+    vector<string> vector_input; //parses the commands
+    vector<string> vector_input2; //parses separators
+    vector<string> commands; // second command vector
+    vector<vector<string>> commandpacks; // 2D Vector
+    vector<char*> char_vector; // contents of vector_input but converted
+    string input; //user input
+    bool exec = false;
+  
+    user_prompt(); //user_prompt works
+    getline (cin, input);
+    parse_commands(vector_input, input);
+    //cout << "Hello World" << endl;
+    
+    
+    while(!vector_input.empty())
+    { 
+      //vector_input2 is currently empty (inserts contents from vector_input)
+      //vector_input2 now has no separator, execvp analyzes these.
+      parse_separators(vector_input2, vector_input, commandpacks, commands);
+      for (int i = 0; i < commandpacks.size(); i++)
       {
-        break;
+        if(exit_terminal(commandpacks,i))
+        {
+          return 0;
+        }
+
+        string_char_conversion(commandpacks.at(i), char_vector);
+        exec = exec_check(char_vector); //execvp -1 or anything else
+        
+        if(connector_test(exec, vector_input2, i) == false)
+        {
+          break;
+        }
+        
+        char_vector.clear();
       }
-
-
-
-      if(input[otherStart] == '|' || input[otherStart] == '&')
-      {
-        otherStart+=1; //if the current start has a non-semicolon
-      }
-      com = input.substr(otherStart,(start-otherStart-1)); //start-1 because it would include the separators
-      commands.push_back(com);
-
-
-      otherStart = start; //otherstart now becomes the position of Start, which is used for the next iteration
-
-      if(start == 0)
-      {
-        break;
-      }
-   }
-
-
-
-    //check commands
-   for(int i = 0; i != commands.size(); i++)
-   {
-     cout << commands.at(i) << endl;
-   }
-
-  //syscall stuff
-
-  for(int j = 0; j != commands.size() ; j++)
-  {
-    char* temp = const_cast <char*> (commands.at(j).c_str());
-    char* args[2] = {temp, NULL};
-    pid_t c_pid, pid;
-    int status;
-
-    c_pid = fork();
-
-    if( c_pid < 0)
-    {
-      perror("fork failed");
-      exit(1);
-      //clear vector
+      vector_input.clear();
     }
-
-    else if (c_pid == 0)
-    {
-      printf("Child: executing j\n");
-      status = execvp(args[0], args);
-      if(status<0) perror("execvp failed");
-    }
-
-    else if (c_pid > 0)
-    {
-      if((pid = wait(&status)) < 0)
-      {
-        perror("wait");
-        exit(1);
-      }
-
-      printf("Parent: finished\n");
-
-    }
-
-   }
-}
-    //ls; mkdir directory; cd directory; touch myfile.txt; ls
+  }
   return 0;
 }
 
+//NOTES:
+
+//execvp(command, flag) - ls -a, etc.
+//put the first command
+//ls -a && echo a
+
+//ls
+//-a
+//execvp reports if error or not - stores the number
+
+//the connectors have to be handled manually right
+//&
+//&
+//after the connectors - look if it's NOT an error (-1) or whatever I store
+//if that's the case, then do it again for echo A
+
+//echo
+//a
+//execvp - takes a single command and does it
+//it does NOT recognize separators
 
 
+//while loop that goes through exec check again
+
+
+//execvp return value is -1 if it's command failed
+//if it did work, and I have an && separator then I go on
+//if it DIDN'T work, then I stop.
+
+//It's the OPPOSITE for ||
+
+//semi colon just goes on
+
+// # breaks it
 

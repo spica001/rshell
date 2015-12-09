@@ -15,6 +15,7 @@
 </ul>
 
 <h2>Known Bugs</h2>
+Quotes do not work with the RShell (but Instructor Crites made it extra credit)
 <ul>
 
 </ul>
