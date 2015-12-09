@@ -11,3 +11,4 @@ rshell: src/rshell.cpp
   
 clean:
 	rm bin/rshell; rmdir bin
+
