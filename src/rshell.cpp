@@ -47,6 +47,11 @@ void parse_commands(vector<string> &vec, const string &str)
    //tokens use iterators, but so auto is used for simplicity
    for (auto it = tokens.begin(); it != tokens.end(); it++) 
    {
+     if(*it == "#")
+     {
+       break; //comment detected (used for killing beginning comments)
+     }
+
      vec.push_back(*it);
      //cout << (*it) << endl;
    }
